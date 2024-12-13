@@ -322,6 +322,7 @@ router.post("/updateStreak", async (req, res) => {
   }
 
   try {
+    // Fetch current user streak and last activity date
     const [result] = await query(
       "SELECT streak, last_activity_date FROM user_data WHERE user_id = $1",
       [userId]
@@ -334,25 +335,37 @@ router.post("/updateStreak", async (req, res) => {
 
     const { streak, last_activity_date } = result;
 
-    const lastActivityDate = new Date(last_activity_date);
-    const today = new Date(todayDate);
+    const lastActivityDate = new Date(last_activity_date); // Stored date
+    const today = new Date(todayDate); // Provided date
 
-    if (isNaN(lastActivityDate.getTime()) || isNaN(today.getTime())) {
-      res.status(400).json({ error: "Invalid date format" });
-      return;
-    }
-
-    let newStreak = streak;
-    const dayDifference = Math.floor(
-      (today.getTime() - lastActivityDate.getTime()) / (1000 * 60 * 60 * 24)
+    // Normalize both dates to UTC and truncate time (date-only comparison)
+    const lastActivityUTC = new Date(
+      Date.UTC(
+        lastActivityDate.getUTCFullYear(),
+        lastActivityDate.getUTCMonth(),
+        lastActivityDate.getUTCDate()
+      )
+    );
+    const todayUTC = new Date(
+      Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
     );
 
+    // Calculate the day difference
+    const dayDifference = Math.floor(
+      (todayUTC.getTime() - lastActivityUTC.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    let newStreak = streak;
+
     if (dayDifference === 1) {
-      newStreak += 1; // Increment streak
+      // Increment streak if logged in the next day
+      newStreak += 1;
     } else if (dayDifference > 1) {
-      newStreak = 0; // Reset streak if more than one day missed
+      // Reset streak if user missed more than one day
+      newStreak = 1;
     }
 
+    // Update the database
     await query(
       "UPDATE user_data SET streak = $1, last_activity_date = $2 WHERE user_id = $3",
       [newStreak, todayDate, userId]
