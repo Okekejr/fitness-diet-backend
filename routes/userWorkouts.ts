@@ -27,6 +27,38 @@ router.get("/getPastUsedWorkouts", async (req: Request, res: Response) => {
   }
 });
 
+router.delete("/deleteUsedWorkouts", async (req: Request, res: Response) => {
+  const { userId } = req.query;
+
+  // Validate the userId parameter
+  if (!userId) {
+    res.status(400).json({ error: "userId is required" });
+    return;
+  }
+
+  try {
+    // Perform the delete operation
+    const result = await query(
+      "DELETE FROM used_workouts WHERE user_id = $1 RETURNING *",
+      [userId]
+    );
+
+    if (result.length === 0) {
+      res.status(404).json({ message: "No used workouts found for the user." });
+      return;
+    }
+
+    // Respond with success
+    res.status(200).json({
+      message: "Used workouts deleted successfully.",
+      deletedWorkouts: result,
+    });
+  } catch (error) {
+    console.error("Error deleting used workouts:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/getWorkoutSchedule", async (req: Request, res: Response) => {
   const { userId } = req.query;
 
@@ -314,10 +346,10 @@ router.get("/streak", async (req, res) => {
 
 // Update streak
 router.post("/updateStreak", async (req, res) => {
-  const { userId, todayDate } = req.body;
+  const { userId } = req.body;
 
-  if (!userId || !todayDate) {
-    res.status(400).json({ error: "Missing userId or todayDate" });
+  if (!userId) {
+    res.status(400).json({ error: "Missing userId" });
     return;
   }
 
@@ -336,7 +368,7 @@ router.post("/updateStreak", async (req, res) => {
     const { streak, last_activity_date } = result;
 
     const lastActivityDate = new Date(last_activity_date); // Stored date
-    const today = new Date(todayDate); // Provided date
+    const today = new Date(); // Use current server date
 
     // Normalize both dates to UTC and truncate time (date-only comparison)
     const lastActivityUTC = new Date(
@@ -368,35 +400,13 @@ router.post("/updateStreak", async (req, res) => {
     // Update the database
     await query(
       "UPDATE user_data SET streak = $1, last_activity_date = $2 WHERE user_id = $3",
-      [newStreak, todayDate, userId]
+      [newStreak, todayUTC, userId]
     );
 
     res.status(200).json({ streak: newStreak });
   } catch (error) {
     console.error("Error updating streak:", error);
     res.status(500).json({ error: "Failed to update streak" });
-  }
-});
-
-// Reset streak
-router.post("/resetStreak", async (req, res) => {
-  const { userId } = req.body;
-
-  if (!userId) {
-    res.status(400).json({ error: "Missing userId" });
-    return;
-  }
-
-  try {
-    await query(
-      "UPDATE user_data SET streak = 0, last_activity_date = NULL WHERE user_id = $1",
-      [userId]
-    );
-
-    res.status(200).json({ streak: 0 });
-  } catch (error) {
-    console.error("Error resetting streak:", error);
-    res.status(500).json({ error: "Failed to reset streak" });
   }
 });
 
