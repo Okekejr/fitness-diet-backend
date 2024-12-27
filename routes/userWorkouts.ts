@@ -93,6 +93,7 @@ router.post("/saveWorkoutSchedule", async (req: Request, res: Response) => {
     req.body;
 
   console.log(userId, workoutSchedule, currentWorkoutWeek, weekStartDate);
+  const today = new Date();
 
   if (!userId || !workoutSchedule || !currentWorkoutWeek || !weekStartDate) {
     res.status(400).json({ error: "Missing required fields" });
@@ -123,6 +124,13 @@ router.post("/saveWorkoutSchedule", async (req: Request, res: Response) => {
         currentWorkoutWeek,
         weekStartDate,
       ]
+    );
+
+    await query(
+      `UPDATE user_data
+      SET last_reset_date = $1
+      WHERE user_id = $2`,
+      [today.toISOString(), userId]
     );
 
     res.status(200).json({ message: "Workout schedule saved successfully" });
